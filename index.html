@@ -1,0 +1,86 @@
+<html>
+	<head>
+		<script src="libs/glMatrix-0.9.5.min.js"></script> 
+		<script src="libs/perlin.js"></script> 
+	    <script src="libs/jquery-3.3.1.min.js"></script>
+    	<script src="lib.js"></script>
+    	<script src="code.js"></script>
+		<link rel="stylesheet" type="text/css" href="style.css">
+	</head>
+	<script id="vertexShader" type="x-shader/x-fragment">
+		#define PI 3.1415926535897932384626433832795
+		#define BUFFER_SIZE 128
+
+		#include<libs/noise>
+
+		attribute vec2 position;
+		uniform float time;
+
+		varying vec3 vertexPosition;
+
+		void main(void) { 
+			vertexPosition = vec3(position, 0.0);
+			vec3 transform = vertexPosition*2.0-vec3(1.0, 1.0 , 0.0);
+			gl_Position = vec4(transform, 1.0);
+		}
+
+	</script>
+	<script id="fragmentShader" type="x-shader/x-fragment">
+		precision highp float;
+		#define BUFFER_SIZE 128
+		uniform vec3 cameraPosition;
+		uniform vec3 lightPosition;
+		uniform sampler2D sampler;
+		uniform float time;
+		uniform int amplitude[BUFFER_SIZE];
+		uniform int frequency[BUFFER_SIZE];
+
+		#include<libs/noise>
+		#define getFromArray(val, array) float(array[int(clamp(val,0.0,127.0))])	
+
+		varying vec3 vertexPosition;
+
+		float getFrequency(float val) {
+			for(int i=0; i < BUFFER_SIZE ; ++i) {
+				if(i == int(clamp(val,0.0,127.0))) {
+					return float(frequency[i])/255.0;
+				}
+			}
+
+			return 0.0;
+		}
+
+		void main(void) {
+			float x = vertexPosition.x;
+			float y = vertexPosition.y;
+			
+			float d = clamp(sqrt(pow(0.5-x, 2.0)+ pow(0.5-y, 2.0))/sqrt(2.0), 0.0, 1.0);
+			float fIndex = d*float(BUFFER_SIZE);
+			float f0 = getFrequency(fIndex );
+			float f1 = getFrequency(fIndex+1.0);
+
+			float dr = fIndex-floor(fIndex);
+			// smooth
+			float f = (1.0-dr)*f0 + dr*f1;
+
+			float sf = 0.0;
+			float waveLength = f*0.25+0.05;
+
+			float nx = x*(0.5+waveLength);
+			float ny = y*(0.5+waveLength);
+
+			float sx = clamp(x + waveLength*myNoiseX(nx, ny, time/128.0+sf), 0.0, 1.0);
+	  		float sy = clamp(y + waveLength*myNoiseX(nx+128.0, ny, time/128.0+sf), 0.0, 1.0);
+
+			vec2 coord = vec2(sx, sy);
+			mediump vec4 sample = texture2D(sampler, coord);
+  			gl_FragColor = vec4(sample.r, sample.g, sample.b, 1.0);
+		}
+	</script>
+	<body>
+		<input type="file" id="myFile" accept=".mp3,audio/*"><br>
+		<canvas id="visualization" width="750" height="750" ></canvas><br>
+		<canvas id="timeDomain" width="375" height="100" ></canvas>
+		<canvas id="frequency" width="375" height="100" ></canvas>
+	</body>
+</html>
